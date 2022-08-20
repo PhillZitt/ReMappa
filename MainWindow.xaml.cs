@@ -22,6 +22,8 @@ namespace ReMappa
 {
   /// <summary>
   /// Interaction logic for MainWindow.xaml
+  /// 
+  /// I really need to pull the non-window code into other classes...
   /// </summary>
   public partial class MainWindow : Window
   {
@@ -50,6 +52,8 @@ namespace ReMappa
 
     private Point ImageSize;
 
+    private Point lastZoneLocation;
+
     public MainWindow()
     {
       InitializeComponent();
@@ -73,6 +77,7 @@ namespace ReMappa
       startRefPoint.Fill = Brushes.Blue;
       startRefPoint.StrokeThickness = 2;
       startRefPoint.Stroke = Brushes.Black;
+      startRefPoint.Visibility = Visibility.Hidden;
       UpdateLocationPointSize(startRefPoint, LOCATION_POINT_DEFAULT_SIZE);
 
       endRefPoint = new System.Windows.Shapes.Ellipse();
@@ -80,6 +85,7 @@ namespace ReMappa
       endRefPoint.Fill = Brushes.Green;
       endRefPoint.StrokeThickness = 2;
       endRefPoint.Stroke = Brushes.Black;
+      endRefPoint.Visibility = Visibility.Hidden;
       UpdateLocationPointSize(endRefPoint, LOCATION_POINT_DEFAULT_SIZE);
 
       CharacterListChanged();
@@ -109,6 +115,13 @@ namespace ReMappa
       watcher.EnableRaisingEvents = true;
     }
 
+    private void Window_SizeChanged(object sender, SizeChangedEventArgs e){
+      //When the window changes size, we need to recompute all of the points
+      if(null == currentZone){
+        return;
+      }
+      Application.Current.Dispatcher.BeginInvoke(new Action(() => UpdateAllLocations(MapXFromZoneToScreen(lastZoneLocation.X), MapYFromZoneToScreen(lastZoneLocation.Y), locationPoint)));
+    }
 
     private void FileWatcherOnChanged(object source, FileSystemEventArgs e)
     {
@@ -164,7 +177,13 @@ namespace ReMappa
       bitmap.UriSource = new Uri(currentZone.imagePath, UriKind.Relative);
       bitmap.EndInit();
       bitmap.Freeze();
-      MapDisplay.Background = new ImageBrush(bitmap);
+      var brush = new ImageBrush(bitmap);
+      
+      //This breaks the display points.
+      //Need to find the fix to ensure canvas sticks to image.
+      //brush.Stretch = Stretch.Uniform;
+     
+      MapDisplay.Background = brush;
       ImageSize = new Point(bitmap.PixelWidth, bitmap.PixelHeight);
       Canvas.SetLeft(locationPoint, -50);
       Canvas.SetTop(locationPoint, -50);
@@ -209,6 +228,15 @@ namespace ReMappa
       Process.Start(psi);
     }
 
+    private void OpenConfigButton_Click(object sender, RoutedEventArgs e){
+      var psi = new ProcessStartInfo
+      {
+        FileName = Directory.GetCurrentDirectory(),
+        UseShellExecute = true
+      };
+      Process.Start(psi);
+    }
+
     private void ToggleRefPointsButton_Click(object sender, RoutedEventArgs e){
       if(startRefPoint.IsVisible){
         startRefPoint.Visibility = Visibility.Hidden;
@@ -233,7 +261,6 @@ namespace ReMappa
 
     private void UpdateAllLocations(double x, double y, System.Windows.Shapes.Ellipse point){
       UpdateLocationPoint(x, y, point);
-
       UpdateLocationPointFromImage(currentZone.imageStartX, currentZone.imageStartY, startRefPoint);
       UpdateLocationPointFromImage(currentZone.imageEndX, currentZone.imageEndY, endRefPoint);
     }
@@ -247,20 +274,25 @@ namespace ReMappa
       MapDisplay.Children.Add(point);
     }
 
+    private void UpdateReferencePoint(double x, double y, System.Windows.Shapes.Ellipse point)
+    {
+      MapDisplay.Children.Remove(point);
+      Canvas.SetLeft(point, x - (point.Width / 2));
+      Canvas.SetBottom(point, y - (point.Height / 2));
+      Canvas.SetZIndex(point, 1);
+      MapDisplay.Children.Add(point);
+    }
+
     private void UpdateLocationPointFromImage(double x, double y, System.Windows.Shapes.Ellipse point)
     {
       var displayX = MapXFromImageToScreen(x);
       var displayY = MapYFromImageToScreen(y);
 
-      if(double.IsInfinity(displayX) || double.IsInfinity(displayY)){
+      if(Double.IsInfinity(displayX) || Double.IsInfinity(displayY)){
         return;
       }
 
-      MapDisplay.Children.Remove(point);
-      Canvas.SetLeft(point, displayX - (point.Width / 2));
-      Canvas.SetBottom(point, displayY - (point.Height / 2));
-      Canvas.SetZIndex(point, 1);
-      MapDisplay.Children.Add(point);
+      UpdateReferencePoint(displayX, displayY, point);
     }
 
     private void UpdateLocation(string stringX, string stringY)
@@ -280,6 +312,9 @@ namespace ReMappa
       {
         return;
       }
+
+      lastZoneLocation.X = zoneLocationX;
+      lastZoneLocation.Y = zoneLocationY;
 
       double displayLocationX = MapXFromZoneToScreen(zoneLocationX);
       double displayLocationY = MapYFromZoneToScreen(zoneLocationY);
