@@ -220,6 +220,10 @@ namespace ReMappa
 
     private void OpenWikiButton_Click(object sender, RoutedEventArgs e)
     {
+      if(currentZone == null){
+        return;
+      }
+
       var psi = new ProcessStartInfo
       {
         FileName = currentZone.infoUrl,

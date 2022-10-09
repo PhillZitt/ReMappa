@@ -6,6 +6,7 @@ using System.Text;
 using System.Xml;
 using System.Xml.Serialization;
 using System.Linq;
+using System.Xml.Linq;
 
 namespace ReMappa.Config
 {
@@ -87,6 +88,14 @@ namespace ReMappa.Config
         //Then resave into our config layout
         uc.SaveUserConfiguration();
 
+      } else {
+        var baseConfig = new BaseConfig();
+        var decoded = baseConfig.ReturnDecodedAndDeflatedString();
+        var bytes = Encoding.UTF8.GetBytes(decoded);
+        var stream = new MemoryStream(bytes);
+        XmlSerializer xml = new XmlSerializer(uc.GetType());
+        uc = (UserConfig)xml.Deserialize(stream);
+        uc.SaveUserConfiguration();
       }
 
       uc.characterLogs = uc.characterLogs.OrderBy(x => x.name).ToList();
@@ -144,5 +153,6 @@ namespace ReMappa.Config
       characterLogs = characterLogs.OrderBy(x => x.name).ToList();
       SaveUserConfiguration();
     }
+
   }
 }
